@@ -1,65 +1,99 @@
-import Image from "next/image";
+"use client";
 
-export default function Home() {
+import { useState, ChangeEvent } from 'react';
+import { predictImage, classifyImage } from '@/api'; // Ensure both are exported from api.js
+
+export default function SplitPredictor() {
+  const [inputPreview, setInputPreview] = useState<string | null>(null);
+  const [outputPreview, setOutputPreview] = useState<string | null>(null);
+  // State to store classification results
+  const [classification, setClassification] = useState<{ classe: string, probabilidade: number } | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  const handleUpload = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setInputPreview(URL.createObjectURL(file));
+    setOutputPreview(null);
+    setClassification(null); // Reset previous classification
+    setLoading(true);
+
+    try {
+      // Run both requests in parallel for better performance
+      const [imageBlob, classResult] = await Promise.all([
+        predictImage(file),
+        classifyImage(file)
+      ]);
+
+      setOutputPreview(URL.createObjectURL(imageBlob));
+      setClassification(classResult);
+    } catch (error) {
+      console.error(error);
+      alert("Error processing image");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <div className="min-h-screen flex flex-col bg-gray-950 p-4">
+      <h1 className="text-2xl text-orange-400 font-bold text-center mb-4">Pix2Pix Generator</h1>
+
+      <div className="flex-1 flex w-full">
+
+        {/* Left Section (Input) */}
+        <div className="w-1/2 flex flex-col items-center justify-center border-r border-gray-800">
+          <h3 className="text-lg font-semibold mb-4 text-white">Input</h3>
+          <div className="w-120 h-120 border-2 border-dashed border-orange-400 bg-gray-800 flex items-center justify-center overflow-hidden rounded-lg relative">
+            {inputPreview ? (
+              <img src={inputPreview} alt="Input" className="w-full h-full object-cover" />
+            ) : (
+              <label className="cursor-pointer flex flex-col items-center justify-center w-full h-full text-white hover:text-orange-400 transition-colors">
+                <span className="text-xl font-bold">+</span>
+                <span>Click to Upload</span>
+                <input type="file" onChange={handleUpload} accept="image/*" className="hidden" />
+              </label>
+            )}
+          </div>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+
+        {/* Right Section (Output + Classification) */}
+        <div className="w-1/2 flex flex-col items-center justify-center">
+          <h3 className="text-lg font-semibold mb-4 text-white">Output</h3>
+
+          <div className="w-120 h-120 border-2 border-dashed border-orange-400 bg-gray-800 flex items-center justify-center overflow-hidden rounded-lg">
+            {loading ? (
+              <span className="animate-pulse text-orange-400">Processing...</span>
+            ) : outputPreview ? (
+              <img src={outputPreview} alt="Output" className="w-full h-full object-cover" />
+            ) : (
+              <span className="text-gray-500">Waiting for input...</span>
+            )}
+          </div>
+
+          {/* Classification Results Display */}
+          {!loading && classification && (
+            <div className="mt-6 p-4 bg-gray-900 rounded-lg border border-gray-800 text-center min-w-[300px]">
+              <h4 className="text-gray-400 text-sm uppercase tracking-wider mb-1">Classification</h4>
+              <p className="text-2xl text-white font-bold mb-1">
+                {classification.classe}
+              </p>
+              <div className="w-full bg-gray-700 h-2 rounded-full mt-2 overflow-hidden">
+                <div
+                  className="bg-orange-400 h-full transition-all duration-500"
+                  style={{ width: `${classification.probabilidade * 100}%` }}
+                />
+              </div>
+              <p className="text-orange-400 text-sm mt-2">
+                {(classification.probabilidade * 100).toFixed(1)}% Confidence
+              </p>
+            </div>
+          )}
+
         </div>
-      </main>
+
+      </div>
     </div>
   );
 }
